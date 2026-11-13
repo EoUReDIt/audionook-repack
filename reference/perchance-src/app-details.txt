@@ -1,0 +1,102 @@
+app.js - DETAILS
+==============
+Path: src/app.js
+Size: 160109 chars, 3657 lines
+
+WHAT IT IS:
+The application hub: boot, routing, playback UI, publishing.
+TTS engine (engine.js) turns text into MP3 blobs locally; Player (player.js) streams them;
+ServerNet (net.js) talks to Explore backend; share.js handles uploads + AI metadata;
+views.js draws the three views. Nothing here uploads audio - published books are (text URL + voice).
+
+IMPORTS:
+import * as store from "./store.js";
+import * as share from "./share.js";
+import * as backup from "./backup.js";
+import * as fssync from "./fssync.js";
+import * as devicesync from "./devicesync.js";
+import * as covers from "./covers.js";
+import { openCropper } from "./crop.js";
+import { TTSEngine, splitTextIntoChunks, setChunkFetcher, getCachedChunk, putCachedChunk } from "./engine.js";
+import { Player } from "./player.js";
+import { ServerNet } from "./net.js";
+import { joinMp3Blobs } from "./audio.js";
+import { renderExplore, renderLibrary, renderCreate, refreshExploreCard } from "./views.js";
+import { Reformatter } from "./reformat.js";
+import { bookCard, coverNode, spinnerNode, paintProceduralCover, emptyState, chip } from "./ui.js";
+import {
+import * as storage from "./storage.js";
+import {
+import { engineForVoice, isLightVoice, MIN_RTF } from "./paradee.js";
+
+APP STATE OBJECT (app = {...}):
+const app = {
+  route: "create",
+  settings: null,
+  engine: null, player: null, net: null,
+  enginePromises: null,
+  currentBook: null,
+  library: [], positions: {},
+  positionsLoaded: false,
+  collections: [],
+  bookmarks: [],
+  bmQueue: null,
+  bookQueue: null,
+  libraryView: { collectionId: null, showArchived: false, bookmarks: false, bookmarkTag: null, drag: null, readFilter: "all", tagFilter: [], filterOpen: false },
+  titling: new Set(),
+  explore: {
+    sort: "top", tagBits: "", query: "", offset: 0, items: [], total: 0,
+    loading: false, error: false, verifying: 0, stats: null, tagOpen: false, tagQuery: "",
+  },
+  searchQuery: "",
+  create: { text: "", voice: null, refs: {} },
+  reformat: { run: null, stage: null },
+  engineStatus: { started: false, ready: false, phase: null, progress: 0, device: null, gpuFailed: false, hasWebGpu: false, failed: false },
+  playerOpen: false,
+  failedChunks: new Set(),
+  listenPending: 0,
+  userScrolledAt: 0,
+  previewCache: new Map(),
+  scrubDragging: false,
+  scrubFrac: 0,
+  sleeping: false,
+};
+window.__app = app;
+
+// ===========================================================================
+// Boot
+// ===========================================================================
+async function boot() {
+  store.ensurePersistentStorage();
+  app.settings = await store.getSettings();
+
+  // Restore an unsaved Create-pane draft (text they were still editing) so a
+  // refresh doesn't lose it — cleared once the audiobook is actually created.
+  const draft = await store.getCreateDraft();
+  if (draft) {
+    if (typeof draft.text === "string") app.create.text = draft.text;
+    if (draft.voice) app.create.voice = draft.voice;
+    if (draft.reformatPreset) app.create.reformatPreset = draft.reformatPreset;
+    if (typeof draft.reformatCustom === "string") app.create.reformatCustom = draft.reformatCustom;
+    if (typeof draft.reformatOn === "boolean") app.create.reformatOn = draft.reformatOn;
+  }
+
+  applyTheme();
+  buildChrome();
+  bui...
+
+ (see full source for rest)
+
+KEY SECTIONS (by function name + line):
+- boot() :77 - init, load settings/library, build UI
+- buildChrome/buildTopBar/buildNav/showRoute/navigate/setSearch :130-282 - shell + routing + search
+- setupEngine/ensureEngine/rebuildEngine/previewVoice :287-466 - TTS engine lifecycle
+- setupPlayer/setupPlayerScreen/scrubber/queue/miniPlayer/reader render :471-881 - playback UI
+- bookmarks/bookmark queue/tag manager :903-1327 - saved spots, queues, tags
+- library/collections/folders/menus/covers/download :1381-2203 - My Library CRUD
+- backup/import :2208-2377 - backup modal + file import
+- explore list/hydrate/verify/onNewBook :2382-2529 - Explore feed
+- createBook/deduceTitle/openBook/ensureTextUrl/share/publish modals :2534-3070 - create + publish
+- deepLink/sleep/settings/createDraft/reformat/drop/keyboard/deviceSync :3078-3626 - misc + sync
+
+FULL SOURCE is in scratch/app.js.txt (attached copy).
