@@ -13,24 +13,25 @@ export function setChunkStore() {}
 export function setNowPlaying() {}
 
 export function createEngine() {
-  const listeners = new Set();
+  const off = async () => { throw new Error("Device sync is not available in the desktop app"); };
   return {
     available: false,
-    linked: false,
     deviceId: null,
-    peers: [],
-    status: "off",
+    secretBytes: null,      // never linked
+    peers: new Map(),       // always empty
+    onSynced: null,
     async init() { await syncmeta.load(); this.deviceId = syncmeta.getDeviceId(); return false; },
     flush() { return syncmeta.saveNow(); },
+    onUpdate() { return () => {}; },
+    getStatus() { return { linked: false, state: "off", peers: [], fingerprint: "", lastSync: null }; },
     setPresence() {},
-    async acceptInvite() { throw new Error("Device sync is not available in the desktop app"); },
-    async createInvite() { throw new Error("Device sync is not available in the desktop app"); },
-    async unlink() {},
+    setActive() {},
+    async fetchChunk() { return null; },
     async syncNow() { return null; },
-    hasPeer() { return false; },
-    getState() { return { linked: false, peers: [], status: "off" }; },
-    on(cb) { listeners.add(cb); return () => listeners.delete(cb); },
-    onChange(cb) { listeners.add(cb); return () => listeners.delete(cb); },
+    async unlink() {},
+    linkUrl() { return ""; },
+    acceptInvite: off,
+    createInvite: off,
   };
 }
 
