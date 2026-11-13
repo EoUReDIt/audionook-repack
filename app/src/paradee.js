@@ -16,6 +16,7 @@
 // ===========================================================================
 
 import { cpuBudget, computeMp3PoolSize } from "./audio.js";
+import { LIGHT_ORT_URL, LIGHT_ORT_WASM_DIR } from "./vendor.js";
 
 // The voice id used everywhere (settings, per-book narrator, chunk cache keys,
 // shared bundles). Cache keys already include the voice, so Paradee audio never
@@ -148,9 +149,10 @@ export const ESPEAK_DATA_PATH = "src/espeak-ng/espeak-ng.data";
 // ONNX build for the Light voices. Verified: no "jsep.mjs" reference in the
 // served file, and bit-identical inference output (see bundle docs).
 export const PARADEE_ORT_VERSION = "1.22.0";
-export const PARADEE_ORT_URL = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${PARADEE_ORT_VERSION}/dist/ort.wasm.min.mjs`;
-export const PARADEE_ORT_WASM_PATHS =
-  `https://cdn.jsdelivr.net/npm/onnxruntime-web@${PARADEE_ORT_VERSION}/dist/`;
+// Desktop build: bundled locally (see src/vendor.js); the version above is
+// what tools/build-vendor.mjs installs.
+export const PARADEE_ORT_URL = LIGHT_ORT_URL;
+export const PARADEE_ORT_WASM_PATHS = LIGHT_ORT_WASM_DIR;
 
 export const PARADEE_SAMPLE_RATE = 24000;
 

@@ -15,5 +15,4 @@ The standalone (Docker-free, server-free) build of the Audionook text-to-speech 
   - `net.js`, `devicesync.js` — inert stand-ins for the server-backed originals.
 - `vendor/` — third-party libraries, bundled so nothing loads from a CDN.
 
-Not here yet: `index.html` (page skeleton), the offline speech-engine libraries and
-models, and the desktop wrapper.
+Not here yet: the desktop wrapper and installer build.

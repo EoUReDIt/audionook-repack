@@ -5,12 +5,22 @@
 // encode/join steps matter for producing non-corrupt MP3s on Chrome).
 // ===========================================================================
 
+import { LAME_URL } from "./vendor.js";
 
 export async function joinWavFiles(wavArrayBuffers) {
-    if(!window.concatAudioBuffers) {
-      let { concat } = await import("https://esm.sh/audio-buffer-utils@5.1.2?bundle&pin=v135");
-      window.concatAudioBuffers = concat;
-    }
+    // Join decoded buffers end to end. (The original pulled a CDN library for
+    // this one call; the desktop build does it locally.)
+    const concatAudioBuffers = (buffers) => {
+      const channels = Math.max(...buffers.map((b) => b.numberOfChannels));
+      const length = buffers.reduce((n, b) => n + b.length, 0);
+      const out = new AudioBuffer({ numberOfChannels: channels, length: Math.max(1, length), sampleRate: buffers[0].sampleRate });
+      let at = 0;
+      for (const b of buffers) {
+        for (let c = 0; c < channels; c++) out.getChannelData(c).set(b.getChannelData(Math.min(c, b.numberOfChannels - 1)), at);
+        at += b.length;
+      }
+      return out;
+    };
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     let audioBuffers = [];
     console.debug("joining wav files internal....")
@@ -148,7 +158,7 @@ export async function wav16ToMp3Blob(wavBlobOrBuffer) {
       // 1) Create the inline worker code
       const workerCode = `
         // Import LAME library
-        importScripts('https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js');
+        importScripts('${LAME_URL}');
   
         /**
          * Parse a 16-bit WAV from an ArrayBuffer
@@ -483,7 +493,7 @@ export async function joinMp3BlobsSlow(mp3Blobs, onProgress) {
     // 2) Inline Worker code: merges all channel data and encodes to MP3
     const workerCode = `
       // Import the LAME library
-      importScripts('https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js');
+      importScripts('${LAME_URL}');
   
       /**
        * Convert Float32 samples to 16-bit PCM

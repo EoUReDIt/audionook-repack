@@ -1,0 +1,21 @@
+{
+  "name": "audionook-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone desktop build of the Audionook text-to-speech audiobook app",
+  "type": "module",
+  "scripts": {
+    "vendor": "node tools/build-vendor.mjs",
+    "serve": "node tools/serve.mjs"
+  },
+  "devDependencies": {
+    "@huggingface/transformers": "3.8.1",
+    "@mozilla/readability": "0.5.0",
+    "@zip.js/zip.js": "2.7.52",
+    "esbuild": "^0.25.0",
+    "kokoro-js": "1.2.1",
+    "lamejs": "1.2.1",
+    "onnxruntime-web": "1.22.0",
+    "pdfjs-dist": "4.10.38"
+  }
+}

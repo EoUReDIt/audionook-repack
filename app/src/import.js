@@ -68,6 +68,30 @@ export function titleFromFileName(name) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// Fit an image to the cover slot's width:height ratio without asking the user.
+// A page or book jacket is portrait and the slot is landscape, so the crop is
+// anchored to the TOP of the image — where a title page keeps its title.
+// (The cropper is still there afterwards for anyone who wants a different cut.)
+export async function fitCoverToAspect(blob, aspect, maxWidth = 1020) {
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const srcAspect = bitmap.width / bitmap.height;
+    let sw = bitmap.width, sh = bitmap.height, sx = 0, sy = 0;
+    if (srcAspect < aspect) sh = Math.round(bitmap.width / aspect);          // too tall: keep the top
+    else { sw = Math.round(bitmap.height * aspect); sx = Math.round((bitmap.width - sw) / 2); } // too wide: keep the centre
+    const outW = Math.min(maxWidth, sw);
+    const outH = Math.round(outW / aspect);
+    const canvas = document.createElement("canvas");
+    canvas.width = outW; canvas.height = outH;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, outW, outH);
+    return await new Promise((resolve) => canvas.toBlob((b) => resolve(b || null), "image/jpeg", 0.88));
+  } finally {
+    if (bitmap.close) bitmap.close();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------

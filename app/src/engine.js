@@ -9,6 +9,7 @@
 
 import { wav16ToMp3Blob, cpuBudget, computeMp3PoolSize } from "./audio.js";
 import * as storage from "./storage.js";
+import { KOKORO_URL, TRANSFORMERS_URL, TRANSFORMERS_WASM_DIR } from "./vendor.js";
 import {
   engineForVoice, toMisaki, espeakG2P, computeParadeePool, computeTitlPool, computeParadee11Pool, computeParadee13Pool, loadParadeeTokenizerJson,
   PARADEE_MODEL_URL_INT8, PARADEE_MODEL_URL_FP32, PARADEE_TOKENIZER_URL,
@@ -93,8 +94,10 @@ export async function putCachedChunk(key, blob) {
 // is inlined inside an IIFE closure and its env is unreachable, so every session
 // silently used ORT's default (min(4, hw/2)) threads — which starves big
 // machines and oversubscribes small ones. See src/README.md ("wasm speedup").
-export const kokoroImportUrl = 'https://esm.sh/kokoro-js@1.2.1?target=es2022';
-export const transformersEnvUrl = 'https://esm.sh/@huggingface/transformers@^3.5.1?target=es2022';
+// Desktop build: both are bundled locally (see src/vendor.js and
+// tools/build-vendor.mjs), still as two modules sharing one transformers copy.
+export const kokoroImportUrl = KOKORO_URL;
+export const transformersEnvUrl = TRANSFORMERS_URL;
 
 
 // Lowercased tokens (runs of dots collapsed) that end in a period but do NOT
@@ -913,6 +916,8 @@ export function splitTextIntoChunks(text, maxSize = 300) {
         try { env.backends.onnx.wasm.numThreads = params.numThreads; } catch(e) { console.warn("could not set numThreads:", e); }
       }
       env.allowLocalModels = false;
+      // Desktop build: load the ONNX runtime from the app's own files, not a CDN.
+      try { env.backends.onnx.wasm.wasmPaths = '${TRANSFORMERS_WASM_DIR}'; } catch(e) { console.warn("could not set wasmPaths:", e); }
       console.debug("initTTS", { availableDevices, numThreads: env.backends.onnx.wasm.numThreads, simd: env.backends.onnx.wasm.simd });
       
       let deviceUsed = "";

@@ -9,6 +9,22 @@
 const base = new URL("../vendor/", import.meta.url);
 const at = (p) => new URL(p, base).href;
 
+// Document parsing
 export const ZIP_URL = at("zipjs/zip.min.js");
 export const PDFJS_URL = at("pdfjs/pdf.min.mjs");
 export const PDFJS_WORKER_URL = at("pdfjs/pdf.worker.min.mjs");
+export const READABILITY_URL = at("readability/readability.js");
+
+// MP3 encoding (loaded with importScripts inside classic workers)
+export const LAME_URL = at("lame/lame.min.js");
+
+// Kokoro. kokoro.js imports ./transformers.js, so both resolve to ONE
+// transformers instance — the engine relies on that to set the thread count.
+export const KOKORO_URL = at("tts/kokoro.js");
+export const TRANSFORMERS_URL = at("tts/transformers.js");
+// Directory holding the WebGPU-capable ONNX runtime transformers.js loads.
+export const TRANSFORMERS_WASM_DIR = at("tts/ort/");
+
+// Light voices: their own wasm-only ONNX runtime.
+export const LIGHT_ORT_URL = at("ort/ort.wasm.min.mjs");
+export const LIGHT_ORT_WASM_DIR = at("ort/");

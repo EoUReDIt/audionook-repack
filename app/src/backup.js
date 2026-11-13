@@ -11,8 +11,8 @@
 // ===========================================================================
 
 import * as store from "./store.js";
+import { ZIP_URL } from "./vendor.js";
 
-const ZIP_URL = "https://esm.sh/@zip.js/zip.js@2.7.52";
 export const BUNDLE_FORMAT = "audionook-library";
 export const BUNDLE_VERSION = 1;
 

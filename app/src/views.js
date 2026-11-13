@@ -11,6 +11,8 @@ import { $, el, icon, toast, openModal, closeModal, formatDuration, formatLongDu
 import { TAGS, tagBitCount, tagBitsHas, toggleTagBit, ALL_VOICES, FEATURED_VOICE_IDS, LIGHT_VOICE_IDS, PAGE_SIZE, WORDS_PER_MINUTE, resolveVoice, liteVoiceLabel, voiceLangLabel } from "./config.js";
 import { bookCard, emptyState, chip, skeletonCards, spinnerNode, folderCard } from "./ui.js";
 import { ACCEPT, MAX_FILE_BYTES, fileToText } from "./import.js";
+import { READABILITY_URL } from "./vendor.js";
+import { features } from "./platform.js";
 import { REFORMAT_PRESETS, presetById, planSegments, condenseDiff, describeResult, mergeContinuations } from "./reformat.js";
 import { setSetting } from "./store.js";
 
@@ -369,7 +371,9 @@ export function renderLibrary(app) {
     }
     app.openDeviceSyncModal();
   });
-  actions.appendChild(syncBtn);
+  // Desktop build: device sync needs the original host's servers (see
+  // features in platform.js), so its button is not shown.
+  if (features.deviceSync) actions.appendChild(syncBtn);
   bar.appendChild(actions);
   host.appendChild(bar);
 
@@ -1091,10 +1095,14 @@ async function loadFile(app, file, ta, status, c, updateStats) {
   if (file.size > MAX_FILE_BYTES) { toast("That file is too large (48 MB max)", { type: "error" }); return; }
   status.textContent = "Reading " + file.name + "…";
   try {
-    const { text } = await fileToText(file, { onProgress: (s) => { status.textContent = s; } });
+    const { text, title, author, cover } = await fileToText(file, { onProgress: (s) => { status.textContent = s; } });
     if (!text || wordCount(text) < 3) throw new Error("no readable text");
     ta.value = text;
     c.text = text;
+    // Desktop build: the document supplies the book's title, author and cover
+    // (see createBook in app.js). `head` ties them to this text, so they are
+    // dropped if the box is later cleared and something else is pasted.
+    c.source = { title, author, cover, head: text.slice(0, 200) };
     updateStats();
     app.saveCreateDraft();
     status.textContent = "";
@@ -1113,7 +1121,7 @@ async function fetchReadableText(url) {
     html = await fetch(url).then((r) => r.text());
   }
   try {
-    const { Readability } = await import("https://esm.sh/@mozilla/readability@0.5.0");
+    const { Readability } = await import(READABILITY_URL);
     const doc = new DOMParser().parseFromString(html, "text/html");
     const article = new Readability(doc).parse();
     if (article && article.textContent && wordCount(article.textContent) >= 20) {

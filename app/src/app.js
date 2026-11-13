@@ -37,6 +37,8 @@ import {
   PAGE_SIZE, WORDS_PER_MINUTE, SLEEP_OPTIONS, COVER_ASPECT, PREFETCH_WINDOW,
 } from "./config.js";
 import { engineForVoice, isLightVoice, MIN_RTF } from "./paradee.js";
+import { features } from "./platform.js";
+import { fitCoverToAspect } from "./import.js";
 
 const app = {
   route: "create",
@@ -2545,11 +2547,14 @@ async function createBook() {
   // matches the global default we store null so the book keeps following it.
   const voice = c.voice && c.voice !== app.settings.voice ? c.voice : null;
   const collectionId = app.libraryView.collectionId ?? null;
+  // Desktop build: a book made from an opened file takes that file's title,
+  // author and cover — provided the text is still the file's text.
+  const src = c.source && text.slice(0, 200) === String(c.source.head || "").trim().slice(0, 200) ? c.source : null;
   const book = {
     id: uid(),
-    title: truncate(autoTitle(text), 100),
-    titleSource: "auto",
-    author: "",
+    title: truncate(src && src.title ? src.title : autoTitle(text), 100),
+    titleSource: src && src.title ? "file" : "auto",
+    author: src && src.author ? truncate(src.author, MAX_AUTHOR) : "",
     blurb: "",
     text,
     voice,
@@ -2562,7 +2567,21 @@ async function createBook() {
     archived: false,
   };
   await store.putBook(book);
+  if (src && src.cover) {
+    try {
+      const fitted = await fitCoverToAspect(src.cover, COVER_ASPECT);
+      if (fitted) {
+        await store.putCover(book.id, fitted);
+        covers.set(book.id, fitted);
+        await store.patchBook(book.id, { coverLocal: true, coverUrl: "" });
+        book.coverLocal = true;
+      }
+    } catch (e) { console.warn("cover from file:", e); }
+  }
   c.text = "";
+  c.source = null;
+  // Empty the box too, so returning to Create doesn't offer the same text again.
+  if (c.refs && c.refs.ta) { c.refs.ta.value = ""; c.refs.ta.dispatchEvent(new Event("input")); }
   flushCreateDraft();
   await loadLibrary();
   openBook(book, { autoplay: true });
@@ -2573,6 +2592,9 @@ async function createBook() {
 // line stands in immediately so the library and reader are never blank, then
 // the AI's title replaces it unless the user has renamed the book by then.
 async function deduceTitle(book, text) {
+  // AI titling only runs once an AI provider is connected, and never over a
+  // title that came from the file itself.
+  if (!features.ai || book.titleSource !== "auto") return;
   app.titling.add(book.id);
   if (app.currentBook && app.currentBook.id === book.id) updatePlayerHeader(app.currentBook);
   try {
