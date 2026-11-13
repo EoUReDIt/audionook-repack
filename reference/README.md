@@ -12,5 +12,5 @@ exported by the repo owner. Third-party code with no licence stated; kept for st
 - `rendered-page.html` — the rendered app markup from `download.mhtml` (scripts stripped by the browser).
 - `app-details.txt` — a summary of `app.js`.
 
-Not yet captured: `player.js`, `import.js`, `crop.js`, `syncmeta.js`, `devicePerf.js`,
+Not yet captured: `import.js`, `crop.js`, `syncmeta.js`, `devicePerf.js`,
 `src/espeak-ng/*`, `src/README.md`, and the Perchance HTML panel.
