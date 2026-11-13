@@ -37,7 +37,8 @@ import {
   PAGE_SIZE, WORDS_PER_MINUTE, SLEEP_OPTIONS, COVER_ASPECT, PREFETCH_WINDOW,
 } from "./config.js";
 import { engineForVoice, isLightVoice, MIN_RTF } from "./paradee.js";
-import { features } from "./platform.js";
+import { features, AI_DISABLED_HINT } from "./platform.js";
+import { hasRealGpu } from "./devicePerf.js";
 import { fitCoverToAspect } from "./import.js";
 
 const app = {
@@ -112,7 +113,7 @@ async function boot() {
   await loadCollections();
   await loadBookmarks();
   showRoute(app.route, { initial: true });
-  loadExplore({ reset: true });
+  if (features.explore) loadExplore({ reset: true });
 
   // First frame is rendered — lift the boot splash (see index.html).
   if (window.__boot) window.__boot.ready();
@@ -254,7 +255,7 @@ function buildNav() {
 // Routing
 // ===========================================================================
 function showRoute(route, { initial = false } = {}) {
-  if (!["explore", "library", "create"].includes(route)) route = "create";
+  if (!["explore", "library", "create"].includes(route) || (route === "explore" && !features.explore)) route = "create";
   app.route = route;
   for (const v of $$(".view")) v.hidden = v.dataset.view !== route;
   for (const n of $$("#sideNav .nav-item, #bottomNav .nav-item")) n.classList.toggle("active", n.dataset.route === route);
@@ -1816,13 +1817,13 @@ function openBookMenu(book) {
       ? { icon: "readMarker", title: "Mark as read", desc: "Keep your place and mark it as read.", onClick: () => markRead(book) }
       : { icon: "unreadMarker", title: "Mark as unread", desc: "Return it to the start and mark it unread.", onClick: () => markUnread(book) },
     { icon: "folder", title: "Add to collection", desc: "File it in a collection, or start a new one.", onClick: () => openAddModal(book) },
-    { icon: "share", title: "Share", desc: "Send a link to a friend, or publish it to Explore.", onClick: () => openShareModal(book) },
+    ...(features.sharing ? [{ icon: "share", title: "Share", desc: "Send a link to a friend, or publish it to Explore.", onClick: () => openShareModal(book) }] : []),
     { icon: "download", title: "Download as MP3", desc: "Synthesise the whole audiobook and save it as one MP3 file.", onClick: () => downloadBook(book) },
   ];
   if (local) {
-    items.splice(3, 0, { icon: "image", title: "Cover art", desc: "Upload your own image, or let us paint one.", onClick: () => openCoverPicker(book) });
+    items.splice(3, 0, { icon: "image", title: "Cover art", desc: features.ai ? "Upload your own image, or let us paint one." : "Choose your own image for this audiobook.", onClick: () => openCoverPicker(book) });
     items.push({ icon: book.archived ? "unarchive" : "archive", title: book.archived ? "Unarchive" : "Archive", desc: book.archived ? "Bring it back into your main library." : "Tuck it away without deleting it.", onClick: () => toggleArchive(book) });
-    items.push({ icon: "trash", title: "Remove", desc: "Deletes it from this device. Published copies stay online.", danger: true, onClick: () => confirmRemove(book) });
+    items.push({ icon: "trash", title: "Remove", desc: features.sharing ? "Deletes it from this device. Published copies stay online." : "Deletes it from this device.", danger: true, onClick: () => confirmRemove(book) });
   }
   body.appendChild(buildOpts(items));
   openModal({ title: "Options", body });
@@ -1976,7 +1977,7 @@ function bookContextMenu(book, { x = 0, y = 0 } = {}) {
     items.push({ icon: "down", label: "Move down", onClick: () => reorderBook(local, 1) });
   }
   items.push({ separator: true });
-  items.push({ icon: "share", label: "Share…", onClick: () => openShareModal(book) });
+  if (features.sharing) items.push({ icon: "share", label: "Share…", onClick: () => openShareModal(book) });
   if (local) {
     items.push({ icon: local.archived ? "unarchive" : "archive", label: local.archived ? "Unarchive" : "Archive", onClick: () => toggleArchive(local) });
     items.push({ icon: "edit", label: "Rename…", onClick: () => renameBook(local) });
@@ -2078,7 +2079,10 @@ function openCoverPicker(book) {
 
   const fileInput = el("input", { type: "file", accept: "image/*", style: { display: "none" } });
   const uploadBtn = chipBtn("Choose image", "image", () => fileInput.click());
-  const genBtn = chipBtn("Paint one", "sparkle", generate);
+  // Desktop build: AI cover art stays visible but unusable until an AI provider
+  // is connected (features.ai in platform.js).
+  const genBtn = chipBtn("Paint one", "sparkle", () => { if (features.ai) generate(); else toast(AI_DISABLED_HINT); }, features.ai ? "" : "is-unavailable");
+  if (!features.ai) { genBtn.title = AI_DISABLED_HINT; genBtn.setAttribute("aria-disabled", "true"); }
   const adjustBtn = chipBtn("Adjust crop", "sliders", () => startCrop(pending));
   const removeBtn = chipBtn("Remove", "trash", removeCover, "ghost");
   const btns = el("div", { class: "chips" }, [uploadBtn, genBtn, adjustBtn, removeBtn, fileInput]);
@@ -3275,7 +3279,59 @@ function openSettings() {
   };
   paintFilter();
   filterField.appendChild(filterWrap);
-  body.appendChild(filterField);
+  // The filter only applies to the Explore catalogue, which the desktop build
+  // doesn't have.
+  if (features.explore) {
+    body.appendChild(filterField);
+    body.appendChild(el("div", { class: "divider" }));
+  }
+
+  // --- Performance (desktop build) --------------------------------------------
+  // `slowMode` is the engine's existing switch (allowWebGpu = !slowMode); this
+  // is its control. It only matters to the full-quality Kokoro voices: the
+  // Light narrators always run on the processor.
+  const gpuField = el("div", { class: "field" });
+  gpuField.appendChild(el("label", { text: "Graphics acceleration" }));
+  const gpuWrap = el("div", { class: "chips" });
+  const gpuHint = el("div", { class: "hint", style: { marginTop: "8px" } });
+  let gpuPresent = null; // null until the probe answers
+  const setGpu = async (on) => {
+    if (on && gpuPresent === false) { toast("No graphics card was found on this device"); return; }
+    if (!!app.settings.slowMode === !on) return;
+    app.settings.slowMode = !on;
+    await store.setSetting("slowMode", !on);
+    paintGpu();
+    try { await rebuildEngine(); } catch (e) { console.warn("engine rebuild:", e); }
+  };
+  const paintGpu = () => {
+    const on = !app.settings.slowMode && gpuPresent !== false;
+    gpuWrap.innerHTML = "";
+    const onBtn = el("button", { class: "chip" + (on ? " active" : "") + (gpuPresent === false ? " is-unavailable" : ""), onclick: () => setGpu(true) }, ["On"]);
+    if (gpuPresent === false) { onBtn.setAttribute("aria-disabled", "true"); onBtn.title = "No graphics card was found on this device"; }
+    gpuWrap.appendChild(onBtn);
+    gpuWrap.appendChild(el("button", { class: "chip" + (on ? "" : " active"), onclick: () => setGpu(false) }, ["Off"]));
+    gpuHint.textContent = gpuPresent === false
+      ? "No graphics card was found, so narration runs on the processor. The Light narrators are the fastest choice on this device."
+      : "Speeds up the full-quality narrators on devices with a graphics card. Turn it off if narration sounds garbled or fails to start. The Light narrators don't use it.";
+  };
+  paintGpu();
+  hasRealGpu().then((ok) => { gpuPresent = !!ok; paintGpu(); }).catch(() => {});
+  gpuField.appendChild(gpuWrap);
+  gpuField.appendChild(gpuHint);
+  body.appendChild(gpuField);
+
+  body.appendChild(el("div", { class: "divider" }));
+
+  // --- AI features (desktop build) --------------------------------------------
+  const aiField = el("div", { class: "field" });
+  aiField.appendChild(el("label", { text: "AI features" }));
+  aiField.appendChild(el("div", { class: "chips" }, [
+    el("span", { class: "chip" + (features.ai ? " active" : " is-unavailable"), "aria-disabled": "true", style: { cursor: "default" } }, [features.ai ? "Connected" : "Not connected"]),
+  ]));
+  aiField.appendChild(el("div", { class: "hint", style: { marginTop: "8px" } , text: features.ai
+    ? "Text clean-up, cover art and automatic titles are available."
+    : "Text clean-up, cover art and automatic book titles need an AI connection, which isn't set up yet. Until then, titles come from the file name and covers from the document or an image you choose." }));
+  body.appendChild(aiField);
 
   body.appendChild(el("div", { class: "divider" }));
 

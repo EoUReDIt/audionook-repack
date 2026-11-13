@@ -12,7 +12,7 @@ import { TAGS, tagBitCount, tagBitsHas, toggleTagBit, ALL_VOICES, FEATURED_VOICE
 import { bookCard, emptyState, chip, skeletonCards, spinnerNode, folderCard } from "./ui.js";
 import { ACCEPT, MAX_FILE_BYTES, fileToText } from "./import.js";
 import { READABILITY_URL } from "./vendor.js";
-import { features } from "./platform.js";
+import { features, AI_DISABLED_HINT } from "./platform.js";
 import { REFORMAT_PRESETS, presetById, planSegments, condenseDiff, describeResult, mergeContinuations } from "./reformat.js";
 import { setSetting } from "./store.js";
 
@@ -382,7 +382,9 @@ export function renderLibrary(app) {
   if (!all.length && !folders.length) {
     host.appendChild(emptyState({
       iconName: "library", title: "Your library is empty",
-      text: "Create an audiobook from any text, or open something from Explore. Your books live on this device and play instantly.",
+      text: features.explore
+        ? "Create an audiobook from any text, or open something from Explore. Your books live on this device and play instantly."
+        : "Create an audiobook from any text or document. Your books live on this device and play instantly.",
       actionLabel: "Create an audiobook", onAction: () => app.navigate("create"),
     }));
     return;
@@ -702,11 +704,16 @@ export function renderCreate(app) {
     el("div", { class: "rf-bar-row" }, [rfPresetSel, rfCustom]),
     el("div", { class: "rf-bar-foot" }, [rfHint, rfRunBtn]),
   ]);
+  // Desktop build: the AI clean-up stays visible but unusable until an AI
+  // provider is connected (features.ai in platform.js).
+  if (!features.ai) c.reformatOn = false;
   const reformatBtn = el("button", {
-    class: "chip rf-toggle" + (c.reformatOn ? " active" : ""),
-    title: "Clean up the text with AI before creating the audiobook",
+    class: "chip rf-toggle" + (c.reformatOn ? " active" : "") + (features.ai ? "" : " is-unavailable"),
+    title: features.ai ? "Clean up the text with AI before creating the audiobook" : AI_DISABLED_HINT,
+    "aria-disabled": features.ai ? "false" : "true",
   }, [icon("sparkle", { size: 15 }), "Reformat text"]);
   reformatBtn.addEventListener("click", () => {
+    if (!features.ai) { toast(AI_DISABLED_HINT); return; }
     c.reformatOn = !c.reformatOn;
     reformatBtn.classList.toggle("active", c.reformatOn);
     rfBar.hidden = !c.reformatOn;
@@ -753,7 +760,7 @@ export function renderCreate(app) {
 
   const privacy = el("div", { class: "privacy-note" }, [
     el("span", { class: "privacy-ic", html: icon("lock", { size: 15 }) }),
-    el("span", { text: "Your audio stays on your own device, completely private, unless you choose to share it." }),
+    el("span", { text: features.sharing ? "Your audio stays on your own device, completely private, unless you choose to share it." : "Your audio stays on your own device, completely private." }),
   ]);
   wrap.appendChild(privacy);
 
