@@ -3,6 +3,7 @@ node_modules/
 app/vendor/
 app/src/paradee13-rt.bundle
 app/src/paradee-tokenizer.json
+app/src/espeak-ng/
 .cache/
 dist/
 src-tauri/target/
