@@ -1,0 +1,91 @@
+name: Build Windows installer
+
+# Builds the NSIS installer (Audionook_<version>_x64-setup.exe) and a portable
+# zip. Download them from the run's "Artifacts" section; pushing a tag that
+# starts with "v" also attaches them to a GitHub release.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, "claude/**"]
+    tags: ["v*"]
+    paths:
+      - "app/**"
+      - "src-tauri/**"
+      - "tools/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/build.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Model downloads from Hugging Face are cached between runs.
+      - uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vendor-models-${{ hashFiles('tools/build-vendor.mjs') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Runs `npm run vendor` first (beforeBuildCommand in tauri.conf.json).
+      - name: Build installer
+        run: npm run build
+
+      - name: Make portable zip
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem src-tauri/target/release -Filter *.exe -File | Where-Object { $_.Name -notmatch 'setup' } | Select-Object -First 1
+          if (-not $exe) { throw "Built executable not found" }
+          New-Item -ItemType Directory -Force -Path dist/portable | Out-Null
+          Copy-Item $exe.FullName dist/portable/Audionook.exe
+          @"
+          Audionook (portable)
+
+          Run Audionook.exe. Nothing is installed.
+
+          It needs Microsoft Edge WebView2, which Windows 10 and 11 normally
+          already have. If the app doesn't open, install the "Evergreen
+          Bootstrapper" from https://developer.microsoft.com/microsoft-edge/webview2/
+          "@ | Set-Content dist/portable/README.txt
+          Compress-Archive -Path dist/portable/* -DestinationPath dist/Audionook-portable-x64.zip -Force
+          Copy-Item src-tauri/target/release/bundle/nsis/*-setup.exe dist/
+          Get-ChildItem dist -File | ForEach-Object { "{0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB) }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audionook-windows
+          path: |
+            dist/*-setup.exe
+            dist/Audionook-portable-x64.zip
+          if-no-files-found: error
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*-setup.exe
+            dist/Audionook-portable-x64.zip

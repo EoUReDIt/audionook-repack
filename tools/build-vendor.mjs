@@ -107,7 +107,12 @@ async function main() {
   await copy(join(NM, "pdfjs-dist/LICENSE"), join(VENDOR, "pdfjs/LICENSE"));
   await copy(join(NM, "@zip.js/zip.js/index.min.js"), join(VENDOR, "zipjs/zip.min.js"));
   await copy(join(NM, "@zip.js/zip.js/LICENSE"), join(VENDOR, "zipjs/LICENSE"));
-  await bundle(join(NM, "@mozilla/readability/index.js"), join(VENDOR, "readability/readability.js"));
+  // Readability is CommonJS; re-export the one class the app imports by name.
+  await build({
+    stdin: { contents: 'import pkg from "@mozilla/readability"; export const Readability = pkg.Readability;', resolveDir: ROOT, loader: "js" },
+    outfile: join(VENDOR, "readability/readability.js"),
+    bundle: true, format: "esm", platform: "browser", target: "es2022", minify: true, legalComments: "linked", logLevel: "warning",
+  });
 
   // --- audio ------------------------------------------------------------------
   // lamejs is loaded with importScripts() inside classic workers: keep the UMD file.
@@ -130,6 +135,10 @@ async function main() {
       },
     }],
   });
+  // Helper the engine uses to check a graphics card computes correctly before
+  // trusting it with Kokoro (it fetches small test kernels from Hugging Face).
+  await copy(join(NM, "@huggingface/kernels/index.js"), join(VENDOR, "tts/kernels.js"));
+  await copy(join(NM, "@huggingface/kernels/LICENSE"), join(VENDOR, "tts/LICENSE-kernels.txt"));
   // The WebGPU-capable ONNX runtime that transformers.js loads for Kokoro.
   for (const f of ["ort-wasm-simd-threaded.jsep.mjs", "ort-wasm-simd-threaded.jsep.wasm"]) {
     await copy(join(NM, "@huggingface/transformers/dist", f), join(VENDOR, "tts/ort", f));

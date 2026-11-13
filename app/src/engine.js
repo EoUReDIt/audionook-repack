@@ -9,7 +9,7 @@
 
 import { wav16ToMp3Blob, cpuBudget, computeMp3PoolSize } from "./audio.js";
 import * as storage from "./storage.js";
-import { KOKORO_URL, TRANSFORMERS_URL, TRANSFORMERS_WASM_DIR } from "./vendor.js";
+import { KOKORO_URL, TRANSFORMERS_URL, TRANSFORMERS_WASM_DIR, KERNELS_URL } from "./vendor.js";
 import {
   engineForVoice, toMisaki, espeakG2P, computeParadeePool, computeTitlPool, computeParadee11Pool, computeParadee13Pool, loadParadeeTokenizerJson,
   PARADEE_MODEL_URL_INT8, PARADEE_MODEL_URL_FP32, PARADEE_TOKENIZER_URL,
@@ -435,7 +435,7 @@ export function splitTextIntoChunks(text, maxSize = 300) {
     const results = [];
     let getKernel, disposeSharedKernelRuntime;
     try {
-      const mod = await import("https://esm.sh/@huggingface/kernels@0.0.1-preview.2");
+      const mod = await import(KERNELS_URL);
       getKernel = mod.getKernel;
       disposeSharedKernelRuntime = mod.disposeSharedKernelRuntime;
     } catch(e) {

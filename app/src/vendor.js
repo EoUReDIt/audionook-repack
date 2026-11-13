@@ -22,6 +22,8 @@ export const LAME_URL = at("lame/lame.min.js");
 // transformers instance — the engine relies on that to set the thread count.
 export const KOKORO_URL = at("tts/kokoro.js");
 export const TRANSFORMERS_URL = at("tts/transformers.js");
+// Graphics-card self-test helper (see runWebgpuSelfTest in engine.js).
+export const KERNELS_URL = at("tts/kernels.js");
 // Directory holding the WebGPU-capable ONNX runtime transformers.js loads.
 export const TRANSFORMERS_WASM_DIR = at("tts/ort/");
 

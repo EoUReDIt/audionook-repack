@@ -92,13 +92,19 @@ const kv = new Proxy({}, {
 // native side does the request (no browser cross-origin limits); in a plain
 // browser we fall back to fetch(), which only works for permissive sites.
 async function superFetch(url, init) {
-  const native = window.__AUDIONOOK_NATIVE__;
-  if (native && typeof native.fetchText === "function") {
-    const text = await native.fetchText(String(url));
+  const tauri = window.__TAURI__;
+  if (tauri && tauri.core && typeof tauri.core.invoke === "function") {
+    // src-tauri/src/main.rs: fetch_text. Rejects with a plain-language message.
+    let text;
+    try { text = await tauri.core.invoke("fetch_text", { url: String(url) }); }
+    catch (e) { throw new Error(typeof e === "string" ? e : (e && e.message) || "Couldn't open that address"); }
     return new Response(text, { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
   }
   return fetch(url, init);
 }
+
+// True when running inside the desktop shell rather than a browser tab.
+export const isDesktop = !!(window.__TAURI__ && window.__TAURI__.core);
 
 const root = {
   kv,

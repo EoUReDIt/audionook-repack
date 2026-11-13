@@ -10,7 +10,7 @@
 import { $, el, icon, toast, openModal, closeModal, formatDuration, formatLongDuration, wordCount } from "./util.js";
 import { TAGS, tagBitCount, tagBitsHas, toggleTagBit, ALL_VOICES, FEATURED_VOICE_IDS, LIGHT_VOICE_IDS, PAGE_SIZE, WORDS_PER_MINUTE, resolveVoice, liteVoiceLabel, voiceLangLabel } from "./config.js";
 import { bookCard, emptyState, chip, skeletonCards, spinnerNode, folderCard } from "./ui.js";
-import { ACCEPT, MAX_FILE_BYTES, fileToText } from "./import.js";
+import { ACCEPT, MAX_FILE_BYTES, fileToText, domToText } from "./import.js";
 import { READABILITY_URL } from "./vendor.js";
 import { features, AI_DISABLED_HINT } from "./platform.js";
 import { REFORMAT_PRESETS, presetById, planSegments, condenseDiff, describeResult, mergeContinuations } from "./reformat.js";
@@ -1133,7 +1133,16 @@ async function fetchReadableText(url) {
     const article = new Readability(doc).parse();
     if (article && article.textContent && wordCount(article.textContent) >= 20) {
       const title = (article.title || "").trim();
-      const body = article.textContent.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+      // Desktop build: rebuild the text from the article's HTML so each block
+      // (paragraph, heading, list item) stays its own paragraph. `textContent`
+      // runs them together when the page has no whitespace between tags.
+      let body = "";
+      try {
+        if (article.content) body = domToText(new DOMParser().parseFromString(article.content, "text/html").body);
+      } catch (e) {}
+      if (wordCount(body) < 20) body = article.textContent.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+      // Readability keeps the page's own headline inside the article; don't say it twice.
+      if (title && body.startsWith(title)) body = body.slice(title.length).trim();
       return title ? title + "\n\n" + body : body;
     }
   } catch (e) {
