@@ -1,0 +1,5 @@
+/* Additions for the standalone build. Loaded after styles.css. */
+
+/* A control that is present but not usable yet (see features in platform.js). */
+.is-unavailable { opacity: 0.45; cursor: not-allowed; }
+.is-unavailable:hover { filter: none; }

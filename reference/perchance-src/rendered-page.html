@@ -1,0 +1,130 @@
+<!DOCTYPE html><html data-theme="dark" class="boot-done"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><link rel="stylesheet" type="text/css" href="cid:css-9309b169-4813-4fea-b923-301a64195434@mhtml.blink" /><link rel="stylesheet" type="text/css" href="cid:css-b293e9c7-d70d-4394-977b-551e525a0b71@mhtml.blink" /><link rel="stylesheet" type="text/css" href="cid:css-f9735416-9740-4d6b-a920-71059e4238c1@mhtml.blink" /><link rel="stylesheet" type="text/css" href="cid:css-fcd5328f-1b43-49fb-bd6f-6ed6d518ab02@mhtml.blink" /><link rel="stylesheet" type="text/css" href="cid:css-b2595259-c54c-4244-9253-067c4008ce7c@mhtml.blink" />
+<title>Perchance</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<base href="https://perchance.org/audionook" target="_parent">
+<meta name="referrer" content="no-referrer">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta id="perch-embed-flags" data-nlp-preload="0" data-src-preload="1" data-src-vote="">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link rel="modulepreload" href="https://perchance.org/src/app.js"><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%225.4%22%20fill%3D%22%23f0a63c%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23231604%22%20stroke-width%3D%221.9%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M6.7%203.6h10.6v16.6l-5.3-3.6-5.3%203.6z%22%2F%3E%3Cpath%20d%3D%22M8.5%2011.6q.9-3%201.8%200q.9%202.5%201.8%200q.8-1.9%201.5%200q.6%201.2%201.1%200q.4-.7.8%200%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E"></head>
+<body id="output-container"><link rel="preconnect" href="https://fonts.googleapis.com/">
+<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Fraunces:opsz,wght@9..144,500..700&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://perchance.org/src/styles.css">
+
+<!-- ==========================================================================
+     BOOT COVER
+     Painted with these inline styles before src/styles.css (or the app's
+     module script) has arrived, so a cold load shows a calm branded splash
+     instead of the raw, unstyled shell. The inline script below flips
+     <html class="boot-done"> once the stylesheet is ready AND app.js has
+     rendered its first frame; a safety timeout guarantees it never sticks.
+     ========================================================================== -->
+
+
+
+
+
+
+<!-- ==========================================================================
+     SERVER (authoritative but PUBLIC source — never put secrets here).
+     Backing store for the Explore listing. Layout mirrors src/config.js STATE.
+     ========================================================================== -->
+
+
+<!-- ==========================================================================
+     APP SHELL
+     ========================================================================== -->
+<div id="app">
+  <div id="bgArt"></div>
+
+  <header id="topBar">
+    <div class="brand">
+      <span class="brand-mark"><svg class="brand-svg" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.7 3.6h10.6v16.6l-5.3-3.6-5.3 3.6z"></path><path d="M8.5 11.6q.9-3 1.8 0q.9 2.5 1.8 0q.8-1.9 1.5 0q.6 1.2 1.1 0q.4-.7.8 0"></path></svg></span>
+      <span class="brand-name">Audionook</span>
+    </div>
+
+    
+
+    <div class="topbar-actions">
+      <button id="themeBtn" class="icon-btn" title="Toggle theme"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"></path></svg></button>
+    <button class="icon-btn" id="settingsBtn" title="Settings"><svg class="icon" viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true"><path d="M5 7h8.5M19 7h-.5M5 17h.5M11 17h8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"></path><circle cx="16" cy="7" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"></circle><circle cx="8" cy="17" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"></circle></svg></button></div>
+  </header>
+
+  <nav id="sideNav">
+    <div class="nav-item nav-create active" data-route="create">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"></path></svg>
+      Create
+    </div>
+    <div class="nav-item" data-route="explore">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"></circle><path d="M15.4 8.6l-2 4.8-4.8 2 2-4.8z"></path></svg>
+      Explore
+    </div>
+    <div class="nav-item" data-route="library">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.6A2.6 2.6 0 0 1 7.6 2H19v20H7.6A2.6 2.6 0 0 1 5 19.4z"></path><path d="M9.2 2v7.4L11.8 7.6 14.4 9.4V2"></path></svg>
+      My Library
+    </div>
+    <div class="side-foot" id="sideFoot"></div>
+  </nav>
+
+  <main id="main">
+    
+    
+    <section id="viewCreate" class="view" data-view="create"><div class="create-wrap"><div class="create-text"><div class="dropzone"><textarea class="textarea" placeholder="Paste your text here, or drop a document…" spellcheck="false" aria-label="Text to narrate"></textarea></div><div class="chips create-actions"><button class="chip"><svg class="icon" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M10.2 13.6a4.1 4.1 0 0 0 5.8 0l2.4-2.4a4.1 4.1 0 1 0-5.8-5.8l-1.1 1.1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"></path><path d="M13.8 10.4a4.1 4.1 0 0 0-5.8 0l-2.4 2.4a4.1 4.1 0 1 0 5.8 5.8l1.1-1.1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"></path></svg>From a URL…</button><button class="chip"><svg class="icon" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M6 3.6h7L18.4 9v11A1.4 1.4 0 0 1 17 21.4H6A1.4 1.4 0 0 1 4.6 20V5A1.4 1.4 0 0 1 6 3.6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path><path d="M12.8 3.6V9h5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path><path d="M8 13.2h8M8 16.6h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>Open a file…</button><button class="chip rf-toggle" title="Clean up the text with AI before creating the audiobook"><svg class="icon" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path><path d="M18.5 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"></path></svg>Reformat text</button><input type="file" accept=".txt,.text,.md,.markdown,.html,.htm,.xhtml,.rtf,.pdf,.docx,.epub,.odt,text/plain" style="display: none;"></div><div class="create-foot"><div class="hint create-status"></div><div class="hint create-stats"></div></div></div><div class="panel create-setup"><div class="voice-pick"><select class="select" aria-label="Narrator voice"><optgroup label="Light &amp; fast"><option value="paradee13_af_heart">Heart · Female · (lite)</option><option value="paradee13_bf_isabella">Isabella · Female · (lite)</option><option value="paradee13_am_puck">Puck · Male · (lite)</option><option value="paradee13_bm_fable">Fable · Male · (lite)</option><option value="paradee13_hf_alpha">Alpha · Female · (lite) · Hindi</option><option value="paradee13_hm_omega">Omega · Male · (lite) · Hindi</option><option value="paradee13_ff_siwis">Siwis · Female · (lite) · French</option><option value="paradee13_em_alex">Alex · Male · (lite) · Spanish</option></optgroup><optgroup label="Recommended"><option value="af_heart">Heart · Female</option><option value="af_bella">Bella · Female</option><option value="af_nicole">Nicole · Female</option><option value="af_sarah">Sarah · Female</option><option value="am_michael">Michael · Male</option><option value="am_adam">Adam · Male</option><option value="bf_emma">Emma · Female</option><option value="bm_george">George · Male</option></optgroup><optgroup label="More voices"><option value="af_sky">Sky · Female · US</option><option value="af_alloy">Alloy · Female · US</option><option value="af_aoede">Aoede · Female · US</option><option value="af_jessica">Jessica · Female · US</option><option value="af_kore">Kore · Female · US</option><option value="af_nova">Nova · Female · US</option><option value="af_river">River · Female · US</option><option value="am_echo">Echo · Male · US</option><option value="am_eric">Eric · Male · US</option><option value="am_fenrir">Fenrir · Male · US</option><option value="am_liam">Liam · Male · US</option><option value="am_onyx">Onyx · Male · US</option><option value="am_puck">Puck · Male · US</option><option value="am_santa">Santa · Male · US</option><option value="bf_isabella">Isabella · Female · UK</option><option value="bf_alice">Alice · Female · UK</option><option value="bf_lily">Lily · Female · UK</option><option value="bm_lewis">Lewis · Male · UK</option><option value="bm_daniel">Daniel · Male · UK</option><option value="bm_fable">Fable · Male · UK</option></optgroup></select><button class="icon-btn voice-prev" title="Preview voice" aria-label="Preview voice"><svg class="icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 7.7Q8 5.5 9.89 6.62L17.11 10.88Q19 12 17.11 13.12L9.89 17.38Q8 18.5 8 16.3Z"></path></svg></button></div><button class="btn btn-primary create-go-btn" disabled=""><svg class="icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M4.6 15.6v-3a7.4 7.4 0 0 1 14.8 0v3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"></path><rect x="3" y="14.2" width="3.6" height="6.2" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.9"></rect><rect x="17.4" y="14.2" width="3.6" height="6.2" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.9"></rect></svg>Create audiobook</button></div><div class="privacy-note"><span class="privacy-ic"><svg class="icon" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><rect x="4.8" y="10.4" width="14.4" height="10.2" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8"></rect><path d="M8.2 10.4V8a3.8 3.8 0 0 1 7.6 0v2.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg></span><span>Your audio stays on your own device, completely private, unless you choose to share it.</span></div></div></section>
+  </main>
+
+  <nav id="bottomNav">
+    <div class="nav-item" data-route="explore">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"></circle><path d="M15.4 8.6l-2 4.8-4.8 2 2-4.8z"></path></svg>
+      Explore
+    </div>
+    <div class="nav-item nav-create active" data-route="create">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"></path></svg>
+      Create
+    </div>
+    <div class="nav-item" data-route="library">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.6A2.6 2.6 0 0 1 7.6 2H19v20H7.6A2.6 2.6 0 0 1 5 19.4z"></path><path d="M9.2 2v7.4L11.8 7.6 14.4 9.4V2"></path></svg>
+      Library
+    </div>
+  </nav>
+</div>
+
+
+
+
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+
+
+</body></html>
