@@ -63,6 +63,10 @@ const PREFETCH_MAX = 12;
 const WARM_AHEAD = 20;
 const WARM_BEHIND = 2;
 
+// With a finite synthesis horizon (TTSEngine.setHorizon), chunks this close
+// behind the playhead are still produced, so a skip-back never has to wait.
+const HORIZON_BEHIND = 4;
+
 // The *prefetch* window: how far from the playhead the background prefetch will
 // resolve chunks into the LOCAL chunk cache from the cache itself or a linked
 // peer. Both default to Infinity — the whole book — so a device can mirror a
@@ -1169,6 +1173,7 @@ export class TTSEngine {
     this.jobs = new Map();     // index -> job for the current book
     this.pending = new Set();  // indices awaiting dispatch
     this.onceJobs = [];        // one-off jobs (voice previews) — always first
+    this.horizonAhead = Infinity; // see setHorizon
     // Release a TTS worker the moment its WAV arrives instead of holding it
     // through the MP3 encode + cache write (see _onWorkerMessage). `false`
     // restores the legacy hold-through-encode behavior; kept as a benchmark
@@ -1626,14 +1631,33 @@ export class TTSEngine {
   _nextIndex() {
     if (this.pending.size === 0) return null;
     const focus = this.focus;
+    // Desktop build: with a finite horizon (see setHorizon) the workers stop
+    // once they are that far ahead of the playhead, instead of running flat out
+    // through the whole book.
+    const limited = this.horizonAhead !== Infinity;
+    const maxAhead = limited ? Math.min(this.total, this.horizonAhead) : this.total;
+    const maxBehind = limited ? HORIZON_BEHIND : this.total;
     for (let d = 0; d <= this.total; d++) {
+      if (d > maxAhead && d > maxBehind) break;
       const a = focus + d;
-      if (a < this.total && this.pending.has(a)) return a;
+      if (d <= maxAhead && a < this.total && this.pending.has(a)) return a;
       const b = focus - d;
-      if (d !== 0 && b >= 0 && this.pending.has(b)) return b;
+      if (d !== 0 && d <= maxBehind && b >= 0 && this.pending.has(b)) return b;
     }
+    if (limited) return null;
     const it = this.pending.values().next();
     return it.done ? null : it.value;
+  }
+
+  // How many chunks past the playhead the workers may synthesise. Infinity
+  // (the default) means the whole book. The player narrows it while audio is
+  // playing so background synthesis doesn't compete with playback on small
+  // machines, and lifts it again when playback stops (see Player._updateHorizon).
+  setHorizon(chunksAhead) {
+    const v = Number.isFinite(chunksAhead) && chunksAhead > 0 ? Math.ceil(chunksAhead) : Infinity;
+    if (v === this.horizonAhead) return;
+    this.horizonAhead = v;
+    this._pump();
   }
 
   // Extra per-message fields for the worker's process handler. Non-English

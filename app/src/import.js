@@ -534,6 +534,23 @@ async function pdfLib() {
   return pdfMod;
 }
 
+// A text run's transform is [a, b, c, d, x, y]; upright text has b and c near
+// zero. Anything turned more than a few degrees is treated as rotated.
+function isRotated(t) {
+  if (!t) return false;
+  const scale = Math.hypot(t[0], t[1]) || 1;
+  return Math.abs(t[1]) / scale > 0.2;
+}
+
+// A PDF's charts and page furniture come through as text too. A paragraph with
+// no letters at all is never narration: rows of chart tick marks ("| | || |||"),
+// axis numbers ("0 500 1000 1500"), rules, and bare page numbers. Read aloud
+// they are silence or a string of digits, so they are dropped.
+// (Chart labels made of words can't be told from headings this way and stay.)
+export function isPdfDebris(paragraph) {
+  return !/\p{L}/u.test(paragraph);
+}
+
 // pdf.js yields positioned text runs. Rebuild lines from their baselines, then
 // paragraphs from the gaps between lines.
 function pageToText(items) {
@@ -541,6 +558,8 @@ function pageToText(items) {
   let cur = null;
   for (const it of items) {
     if (typeof it.str !== "string") continue;
+    // Text drawn at an angle is a chart's axis label or a watermark, never prose.
+    if (isRotated(it.transform)) continue;
     const y = it.transform ? it.transform[5] : 0;
     const x = it.transform ? it.transform[4] : 0;
     const h = it.height || (it.transform ? Math.abs(it.transform[3]) : 0) || 10;
@@ -642,7 +661,7 @@ async function readPdf(file, say) {
         }
       }
     }
-    const text = paras.join("\n\n");
+    const text = paras.filter((p) => !isPdfDebris(p)).join("\n\n");
     if (!text.trim()) throw new Error("this PDF has no text layer (it looks like scanned images)");
     return { text, title, author, cover };
   } finally {

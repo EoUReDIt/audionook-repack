@@ -119,9 +119,11 @@ async function boot() {
   // First frame is rendered — lift the boot splash (see index.html).
   if (window.__boot) window.__boot.ready();
 
-  // The voice model is loaded lazily (first play / preview / create), never
-  // speculatively on load, and released again once idle (see tickEngineIdle).
+  // The large Kokoro model is loaded lazily (first play / preview / create),
+  // never speculatively on load, and released again once idle (see
+  // tickEngineIdle). The small Light engine is the exception: see prewarmEngine.
   setInterval(() => tickEngineIdle(), 30000);
+  setTimeout(prewarmEngine, 800);
 
   window.addEventListener("online", () => { if (app.net.status === "offline") app.net.connect(); });
   window.addEventListener("beforeunload", () => { persistPosition(); flushCreateDraft(); devicesync.engine.flush(); });
@@ -382,10 +384,30 @@ function noteEngineSpeed({ engine, avg, samples }) {
 // new book, a seek to something not yet cached — just rebuilds it on demand.
 const ENGINE_IDLE_UNLOAD_MS = 4 * 60 * 1000;
 
+// Desktop build: load the Light engine in the background shortly after the app
+// opens, so the first press of Play starts speaking straight away instead of
+// waiting for the engine. Only the Light engine: it is bundled with the app and
+// small. Kokoro is hundreds of megabytes and still loads on demand.
+function prewarmEngine() {
+  try {
+    const voice = (app.create && app.create.voice) || app.settings.voice;
+    if (!isLightVoice(voice)) return;
+    ensureEngine(engineForVoice(voice)).catch(() => {});
+  } catch (e) {}
+}
+
+// A handful of Light workers costs little memory, so they stay loaded and the
+// engine is always ready. Machines with many cores build many workers; there
+// the idle unload below still applies.
+const LIGHT_KEEP_LOADED_MAX_WORKERS = 4;
+
 function tickEngineIdle() {
   if (!app.enginePromises || !Object.keys(app.enginePromises).length) return;
   const eng = app.engine;
   if (!eng || !eng.ready) return;
+  const loaded = Object.keys(app.enginePromises);
+  const liveWorkers = (eng.workers || []).filter((w) => w && !w.dead).length;
+  if (loaded.every((e) => e !== "kokoro") && liveWorkers <= LIGHT_KEEP_LOADED_MAX_WORKERS) return;
   if (eng.pendingCount > 0 || eng.busyCount > 0 || eng.warmCount > 0) { app._ttsActiveAt = Date.now(); return; }
   if (Date.now() - (app._ttsActiveAt || 0) < ENGINE_IDLE_UNLOAD_MS) return;
   unloadEngine();
@@ -1398,6 +1420,15 @@ async function downloadCurrentBook() {
   openModal({ title: "Download: " + (book.title || "Untitled"), body, actions: [{ label: "Cancel", class: "btn-ghost", onClick: () => { app._downloadCancel = true; closeModal(); } }] });
   app._downloadCancel = false;
   const t0 = Date.now();
+  // The export needs every segment, so lift the generate-ahead limit that
+  // applies during playback (see Player._updateHorizon) until it is done.
+  p.setGenerateAll(true);
+  try {
+    await waitForAllSegments();
+  } finally {
+    if (p.book === book) p.setGenerateAll(false);
+  }
+  async function waitForAllSegments() {
   while (p.book === book && p.blobs.size + app.failedChunks.size < total) {
     if (app._downloadCancel) return;
     detail.textContent = `Segment ${Math.min(total, p.blobs.size + app.failedChunks.size)} of ${total} · ${Math.round((p.blobs.size / total) * 100)}%`;
@@ -1405,7 +1436,9 @@ async function downloadCurrentBook() {
     if (Date.now() - t0 > 60 * 60 * 1000) { closeModal(); toast("Download timed out", { type: "error" }); return; }
     await sleep(500);
   }
+  }
   if (app._downloadCancel || p.book !== book) return;
+  if (p.blobs.size + app.failedChunks.size < total) return; // timed out above
   const blobs = [];
   for (let i = 0; i < total; i++) {
     const rec = p.blobs.get(i);

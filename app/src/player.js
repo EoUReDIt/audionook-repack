@@ -22,6 +22,12 @@ import { WORDS_PER_MINUTE } from "./config.js";
 import { coverDataUrl } from "./util.js";
 import { coverUrlFor } from "./covers.js";
 
+// Desktop build: while audio is playing, keep synthesis this far ahead of the
+// listener and no further. Generating a whole book flat out makes a small
+// laptop stutter (and run hot) for no benefit to what is being heard. When
+// playback is paused the limit lifts and the rest of the book is produced.
+const LOOKAHEAD_SECONDS = 10 * 60;
+
 export class Player {
   constructor({ engine, onState, onListen, onBookEnd }) {
     this.engine = engine;
@@ -48,6 +54,26 @@ export class Player {
     this._watchdog = null;
     this._unstickTries = 0;
     this._lastTick = performance.now();
+    this.generateAll = false;
+  }
+
+  // An MP3 export needs every chunk, whatever the listener is doing.
+  setGenerateAll(on) {
+    this.generateAll = !!on;
+    this._updateHorizon();
+  }
+
+  // Tell the engine how far ahead of the playhead it may synthesise (in chunks,
+  // converted from LOOKAHEAD_SECONDS using each chunk's known or estimated
+  // length). Called whenever play state or position changes.
+  _updateHorizon() {
+    const eng = this.engine;
+    if (!eng || typeof eng.setHorizon !== "function") return;
+    if (!this.book || !this.isPlaying || this.generateAll) { eng.setHorizon(Infinity); return; }
+    let t = 0, n = 0;
+    for (let i = this.currentIndex; i < this.chunks.length && t < LOOKAHEAD_SECONDS; i++) { t += this.chunkDuration(i); n++; }
+    // Reached the end of the book inside the window: nothing to hold back.
+    eng.setHorizon(this.currentIndex + n >= this.chunks.length ? Infinity : n);
   }
 
   _attachHandlers() {
@@ -110,6 +136,7 @@ export class Player {
       this.offset = position.offset || 0;
     }
     this.engine.setBook(chunks, this.voice);
+    this._updateHorizon();
     this.engine.setFocus(this.currentIndex);
     this._startListenTicker();
     this._emit();
@@ -117,6 +144,8 @@ export class Player {
 
   close(emit = true) {
     this._token++;
+    this.generateAll = false;
+    if (this.engine && typeof this.engine.setHorizon === "function") this.engine.setHorizon(Infinity);
     for (const el of this.el) {
       el._pending = false;
       try { el.pause(); } catch (e) {}
@@ -168,6 +197,7 @@ export class Player {
     if (!this.book) return;
     this.isPlaying = true;
     this._unstickTries = 0;
+    this._updateHorizon();
     if (this.blobs.has(this.currentIndex)) {
       const el = this.activeEl;
       if (el._idx === this.currentIndex && !el.paused) {
@@ -186,6 +216,7 @@ export class Player {
 
   pause() {
     this.isPlaying = false;
+    this._updateHorizon();
     this._pauseAll();
     this._setMediaPlaybackState(false);
     this._emit();
@@ -199,6 +230,7 @@ export class Player {
     i = Math.max(0, Math.min(this.chunks.length - 1, i | 0));
     this.currentIndex = i;
     this.offset = Math.max(0, offset);
+    this._updateHorizon();
     this.engine.setFocus(i);
     if (this.isPlaying) {
       if (this.blobs.has(i)) this._startAt(i, this.offset);
@@ -302,6 +334,7 @@ export class Player {
     const p = target.play();
     if (p && p.catch) p.catch(() => { if (token === this._token) { target._pending = false; this.buffering = true; this._scheduleEmit(); } });
     this._preload(i + 1);
+    this._updateHorizon();
     this.engine.setFocus(Math.min(this.chunks.length - 1, i + 1));
     this._setMediaPlaybackState(true);
     this._emit();
@@ -324,6 +357,7 @@ export class Player {
     if (next >= this.chunks.length) {
       this.isPlaying = false;
       this.offset = this.chunkDuration(this.currentIndex);
+      this._updateHorizon();
       this._pauseAll();
       this._setMediaPlaybackState(false);
       this.onBookEnd();
