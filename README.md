@@ -69,4 +69,17 @@ npm run build
   PDF's first page.
 - Settings has a Speech engine choice: Best quality (Kokoro-82M on a graphics card),
   Balanced (Kokoro-82M on the processor) or Light & fast (Paradee-8M, built in).
+- While audio plays, speech is generated about ten minutes ahead of the listener rather
+  than all at once, which keeps small laptops responsive.
+- Chart tick marks, axis numbers and bare page numbers are dropped when importing a PDF.
 - Nothing loads from a CDN: libraries, fonts and the Light voice model are bundled.
+
+## More
+
+| Document | What it covers |
+|---|---|
+| [docs/HISTORY.md](docs/HISTORY.md) | How the project came to be, and who decided and did what |
+| [CHANGELOG.md](CHANGELOG.md) | What changed, sprint by sprint |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | The next sprint and ideas saved for later |
+| [CREDITS.md](CREDITS.md) | The original app, voice models, libraries and their licences |
+| [AGENTS.md](AGENTS.md) | Working rules for AI agents contributing to this repository |
