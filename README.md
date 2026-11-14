@@ -67,5 +67,6 @@ npm run build
   is connected (`app/src/platform.js`).
 - Titles come from the document or its file name; covers from an EPUB's cover image or a
   PDF's first page.
-- Settings has a Graphics acceleration switch for the full-quality narrators.
+- Settings has a Speech engine choice: Best quality (Kokoro-82M on a graphics card),
+  Balanced (Kokoro-82M on the processor) or Light & fast (Paradee-8M, built in).
 - Nothing loads from a CDN: libraries, fonts and the Light voice model are bundled.

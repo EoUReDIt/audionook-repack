@@ -35,8 +35,9 @@ import {
   ALL_VOICES, FEATURED_VOICE_IDS, LIGHT_VOICE_IDS, voiceLabel, voiceLangLabel, liteVoiceLabel, sampleTextFor, SAMPLE_TEXT, TAGS,
   tagBitsFromNames, MAX_TAGS_PER_BOOK, MAX_BLURB, MAX_TITLE, MAX_AUTHOR,
   PAGE_SIZE, WORDS_PER_MINUTE, SLEEP_OPTIONS, COVER_ASPECT, PREFETCH_WINDOW,
+  DEFAULT_VOICE, PARADEE13_DEFAULT,
 } from "./config.js";
-import { engineForVoice, isLightVoice, MIN_RTF } from "./paradee.js";
+import { engineForVoice, isLightVoice, MIN_RTF, PARADEE13_VOICES, paradee13Meta } from "./paradee.js";
 import { features, AI_DISABLED_HINT } from "./platform.js";
 import { hasRealGpu } from "./devicePerf.js";
 import { fitCoverToAspect } from "./import.js";
@@ -368,7 +369,7 @@ function noteEngineSpeed({ engine, avg, samples }) {
   if (isLightVoice(app.settings.voice)) return;
   app._slowKokoroToastShown = true;
   store.setSetting("slowHintShown", true).catch(() => {});
-  toast("Narration is running slower than listening speed on this device — the Light narrators (look for “Light & fast” in Settings) are much faster here. You can switch in Settings.", { timeout: 9000 });
+  toast("Narration is running slower than listening speed on this device. Switching Speech engine to “Light & fast” in Settings will keep it ahead of playback.", { timeout: 9000 });
 }
 
 // Free the worker pool once it has no work left to do. Each wasm worker keeps a
@@ -3184,32 +3185,104 @@ function openSettings() {
   body.appendChild(el("div", { class: "divider" }));
 
   // --- Playback -------------------------------------------------------------
-  const playback = el("div", { class: "field" });
+  // Desktop build: the speech engine is chosen explicitly. The three levels map
+  // onto what the engine already supports:
+  //   best     Kokoro-82M on the graphics card (full-precision model)
+  //   balanced Kokoro-82M on the processor (compact model; `slowMode`)
+  //   light    Paradee-8M (bundled, single-threaded, many times realtime)
+  // The level is derived from the default narrator plus `slowMode`, so it can
+  // never disagree with what will actually run.
+  const ENGINE_LEVELS = [
+    { id: "best", label: "Best quality · Kokoro-82M (graphics card)",
+      hint: "The most natural narration, with 28 English voices. Needs a graphics card. Downloads about 325 MB the first time it is used." },
+    { id: "balanced", label: "Balanced · Kokoro-82M (processor)",
+      hint: "The same 28 voices, run on the processor with a compact model. No graphics card needed, but on a slower laptop narration can fall behind and pause to catch up. Downloads about 90 MB the first time it is used." },
+    { id: "light", label: "Light & fast · Paradee-8M",
+      hint: "Eight voices in English, Hindi, French and Spanish. Built in, works with no internet, and stays ahead of playback on almost any machine. Slightly less natural than Kokoro." },
+  ];
+  let gpuPresent = null; // null until the probe answers
+  const engineLevel = () => {
+    if (isLightVoice(app.settings.voice)) return "light";
+    return app.settings.slowMode || gpuPresent === false ? "balanced" : "best";
+  };
+  const knownVoice = (id) => ALL_VOICES.some((v) => v.id === id);
+  const lightTwin = (id) => { const m = PARADEE13_VOICES.find((v) => v.kokoro === id); return m ? m.id : PARADEE13_DEFAULT; };
+  const kokoroTwin = (id) => { const m = paradee13Meta(id); return m && knownVoice(m.kokoro) ? m.kokoro : DEFAULT_VOICE; };
+
+  const engineField = el("div", { class: "field" });
+  engineField.appendChild(el("label", { text: "Speech engine" }));
+  const engineSelect = el("select", { class: "select", "aria-label": "Speech engine" });
+  const engineHint = el("div", { class: "hint", style: { marginTop: "8px" } });
+  engineField.appendChild(engineSelect);
+  engineField.appendChild(engineHint);
+
+  const playback = el("div", { class: "field", style: { marginTop: "16px" } });
   playback.appendChild(el("label", { text: "Default narrator" }));
   const voiceSelect = el("select", { class: "select" });
-  const light = ALL_VOICES.filter((v) => LIGHT_VOICE_IDS.includes(v.id));
-  const featured = ALL_VOICES.filter((v) => FEATURED_VOICE_IDS.includes(v.id));
-  const others = ALL_VOICES.filter((v) => !FEATURED_VOICE_IDS.includes(v.id) && !LIGHT_VOICE_IDS.includes(v.id));
-  const og0 = el("optgroup", { label: "Light & fast" });
-  for (const v of light) og0.appendChild(el("option", { value: v.id, text: liteVoiceLabel(v) }));
-  const og1 = el("optgroup", { label: "Recommended" });
-  for (const v of featured) og1.appendChild(el("option", { value: v.id, text: `${v.name} · ${v.gender}` }));
-  const og2 = el("optgroup", { label: "More voices" });
-  for (const v of others) og2.appendChild(el("option", { value: v.id, text: `${v.name} · ${v.gender} · ${voiceLangLabel(v.id)}` }));
-  voiceSelect.append(og0, og1, og2);
-  voiceSelect.value = app.settings.voice;
-  voiceSelect.addEventListener("change", () => {
-    app.settings.voice = voiceSelect.value;
-    store.setSetting("voice", voiceSelect.value);
+  // Only the chosen engine's narrators are listed, so picking a narrator can't
+  // silently switch engines.
+  const paintVoices = () => {
+    voiceSelect.innerHTML = "";
+    if (engineLevel() === "light") {
+      for (const v of ALL_VOICES.filter((x) => LIGHT_VOICE_IDS.includes(x.id))) voiceSelect.appendChild(el("option", { value: v.id, text: liteVoiceLabel(v) }));
+    } else {
+      const og1 = el("optgroup", { label: "Recommended" });
+      for (const v of ALL_VOICES.filter((x) => FEATURED_VOICE_IDS.includes(x.id))) og1.appendChild(el("option", { value: v.id, text: `${v.name} · ${v.gender}` }));
+      const og2 = el("optgroup", { label: "More voices" });
+      for (const v of ALL_VOICES.filter((x) => !FEATURED_VOICE_IDS.includes(x.id) && !LIGHT_VOICE_IDS.includes(x.id))) og2.appendChild(el("option", { value: v.id, text: `${v.name} · ${v.gender} · ${voiceLangLabel(v.id)}` }));
+      voiceSelect.append(og1, og2);
+    }
+    voiceSelect.value = app.settings.voice;
+  };
+  const paintEngine = () => {
+    engineSelect.innerHTML = "";
+    for (const lv of ENGINE_LEVELS) {
+      const noGpu = lv.id === "best" && gpuPresent === false;
+      const opt = el("option", { value: lv.id, text: lv.label + (noGpu ? " — no graphics card found" : "") });
+      if (noGpu) opt.disabled = true;
+      engineSelect.appendChild(opt);
+    }
+    const level = engineLevel();
+    engineSelect.value = level;
+    engineHint.textContent = ENGINE_LEVELS.find((l) => l.id === level).hint;
+  };
+  const applyDefaultVoice = (voice, { announce = true } = {}) => {
+    app.settings.voice = voice;
+    store.setSetting("voice", voice);
     if (app.create) {
-      app.create.voice = voiceSelect.value;
-      if (app.create.refs && app.create.refs.voiceSelect) app.create.refs.voiceSelect.value = voiceSelect.value;
+      app.create.voice = voice;
+      if (app.create.refs && app.create.refs.voiceSelect) app.create.refs.voiceSelect.value = voice;
     }
     // Books with their own narrator keep it; books on the default follow along.
     const book = app.player.book;
     if (book && !book.voice) { app.player.setVoice(app.settings.voice); app.failedChunks.clear(); }
-    toast("Default narrator: " + voiceLabel(voiceSelect.value));
+    if (announce) toast("Default narrator: " + voiceLabel(voice));
+  };
+  voiceSelect.addEventListener("change", () => applyDefaultVoice(voiceSelect.value));
+  engineSelect.addEventListener("change", async () => {
+    const level = engineSelect.value;
+    if (level === engineLevel()) return;
+    const voice = app.settings.voice;
+    if (level === "light") {
+      applyDefaultVoice(isLightVoice(voice) ? voice : lightTwin(voice), { announce: false });
+    } else {
+      // "best" clears the processor-only switch; "balanced" sets it.
+      const slow = level !== "best";
+      const slowChanged = !!app.settings.slowMode !== slow;
+      if (slowChanged) { app.settings.slowMode = slow; await store.setSetting("slowMode", slow); }
+      applyDefaultVoice(isLightVoice(voice) ? kokoroTwin(voice) : voice, { announce: false });
+      // The graphics choice is fixed when the engine is created, so rebuild it.
+      if (slowChanged) { try { await rebuildEngine(); } catch (e) { console.warn("engine rebuild:", e); } }
+    }
+    paintEngine();
+    paintVoices();
+    toast("Speech engine: " + ENGINE_LEVELS.find((l) => l.id === engineLevel()).label.split(" · ")[0] + " — narrator " + voiceLabel(app.settings.voice));
   });
+  paintEngine();
+  paintVoices();
+  hasRealGpu().then((ok) => { gpuPresent = !!ok; paintEngine(); paintVoices(); }).catch(() => {});
+  body.appendChild(engineField);
+
   const prevBtn = el("button", { class: "icon-btn voice-prev", title: "Preview voice", "aria-label": "Preview voice", html: icon("play", { size: 18 }) });
   prevBtn.addEventListener("click", () => previewVoice(voiceSelect.value, prevBtn));
   playback.appendChild(el("div", { class: "voice-pick" }, [voiceSelect, prevBtn]));
@@ -3285,42 +3358,6 @@ function openSettings() {
     body.appendChild(filterField);
     body.appendChild(el("div", { class: "divider" }));
   }
-
-  // --- Performance (desktop build) --------------------------------------------
-  // `slowMode` is the engine's existing switch (allowWebGpu = !slowMode); this
-  // is its control. It only matters to the full-quality Kokoro voices: the
-  // Light narrators always run on the processor.
-  const gpuField = el("div", { class: "field" });
-  gpuField.appendChild(el("label", { text: "Graphics acceleration" }));
-  const gpuWrap = el("div", { class: "chips" });
-  const gpuHint = el("div", { class: "hint", style: { marginTop: "8px" } });
-  let gpuPresent = null; // null until the probe answers
-  const setGpu = async (on) => {
-    if (on && gpuPresent === false) { toast("No graphics card was found on this device"); return; }
-    if (!!app.settings.slowMode === !on) return;
-    app.settings.slowMode = !on;
-    await store.setSetting("slowMode", !on);
-    paintGpu();
-    try { await rebuildEngine(); } catch (e) { console.warn("engine rebuild:", e); }
-  };
-  const paintGpu = () => {
-    const on = !app.settings.slowMode && gpuPresent !== false;
-    gpuWrap.innerHTML = "";
-    const onBtn = el("button", { class: "chip" + (on ? " active" : "") + (gpuPresent === false ? " is-unavailable" : ""), onclick: () => setGpu(true) }, ["On"]);
-    if (gpuPresent === false) { onBtn.setAttribute("aria-disabled", "true"); onBtn.title = "No graphics card was found on this device"; }
-    gpuWrap.appendChild(onBtn);
-    gpuWrap.appendChild(el("button", { class: "chip" + (on ? "" : " active"), onclick: () => setGpu(false) }, ["Off"]));
-    gpuHint.textContent = gpuPresent === false
-      ? "No graphics card was found, so narration runs on the processor. The Light narrators are the fastest choice on this device."
-      : "Speeds up the full-quality narrators on devices with a graphics card. Turn it off if narration sounds garbled or fails to start. The Light narrators don't use it.";
-  };
-  paintGpu();
-  hasRealGpu().then((ok) => { gpuPresent = !!ok; paintGpu(); }).catch(() => {});
-  gpuField.appendChild(gpuWrap);
-  gpuField.appendChild(gpuHint);
-  body.appendChild(gpuField);
-
-  body.appendChild(el("div", { class: "divider" }));
 
   // --- AI features (desktop build) --------------------------------------------
   const aiField = el("div", { class: "field" });
