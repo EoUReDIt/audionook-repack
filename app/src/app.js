@@ -292,7 +292,12 @@ function setSearch(q) {
 // ===========================================================================
 function setupEngine() {
   app.engine = new TTSEngine({
-    allowWebGpu: !app.settings.slowMode,
+    // Desktop build: `gpuOff` is the "Graphics card: Off" choice under Best
+    // quality — the full model, kept on the processor.
+    allowWebGpu: !app.settings.slowMode && !app.settings.gpuOff,
+    // Desktop build: "Best quality" (slowMode off) loads the full-precision
+    // Kokoro model wherever it runs; "Balanced" (slowMode on) the compact one.
+    fullPrecision: !app.settings.slowMode,
     // How far the background prefetch reaches from the playhead (Infinity = the
     // whole book — see PREFETCH_WINDOW in config.js).
     prefetchAhead: PREFETCH_WINDOW.ahead,
@@ -338,8 +343,17 @@ function ensureEngine(engine = "kokoro") {
   app._ttsActiveAt = Date.now();
   app.engineStatus.started = true;
   app.engineStatus.failed = false; // a retry after a past failure shows progress, not the old error
+  // Desktop build: the status line is shared by every engine. If this one still
+  // has to load (for example Kokoro, after the Light engine was already up),
+  // show its progress instead of the other engine's "ready".
+  if (!app.engine.poolReady(engine)) { app.engineStatus.ready = false; app.engineStatus.phase = null; app.engineStatus.progress = 0; }
   updateEngineStatus();
-  app.enginePromises[engine] = app.engine.init(engine).then(() => {
+  // Desktop build: remember which engine object this init belongs to. If the
+  // engine is rebuilt meanwhile (see rebuildEngine), this result is about an
+  // engine that no longer exists and must not touch the new one's state.
+  const owner = app.engine;
+  app.enginePromises[engine] = owner.init(engine).then(() => {
+    if (app.engine !== owner) return false;
     const alive = app.engine.poolReady(engine);
     if (!alive) {
       // Don't cache the dead init: the next attempt retries instead of
@@ -352,6 +366,7 @@ function ensureEngine(engine = "kokoro") {
     }
     return true;
   }).catch((e) => {
+    if (app.engine !== owner) return false;
     console.warn("engine init:", e);
     delete app.enginePromises[engine]; // transient failure retries next time
     app.engineStatus.failed = true;
@@ -433,7 +448,10 @@ async function rebuildEngine() {
   ensureEngine(engineForVoice((snap && snap.book && (snap.book.voice || app.settings.voice)) || app.settings.voice));
   if (snap) {
     app.failedChunks.clear();
-    p.open(snap.book, snap.chunks, { position: { index: snap.index, offset: snap.offset }, voice: snap.book.voice });
+    // Desktop build: a book that follows the default narrator has no voice of
+    // its own, so resolve it the way openBook does. Passing the raw (empty)
+    // value left the player with no narrator and every segment failed.
+    p.open(snap.book, snap.chunks, { position: { index: snap.index, offset: snap.offset }, voice: bookVoice(snap.book) });
     p.setupMediaSession();
     renderReader(snap.book);
     if (snap.playing) p.play();
@@ -3226,17 +3244,26 @@ function openSettings() {
   // The level is derived from the default narrator plus `slowMode`, so it can
   // never disagree with what will actually run.
   const ENGINE_LEVELS = [
-    { id: "best", label: "Best quality · Kokoro-82M (graphics card)",
-      hint: "The most natural narration, with 28 English voices. Needs a graphics card. Downloads about 325 MB the first time it is used." },
-    { id: "balanced", label: "Balanced · Kokoro-82M (processor)",
-      hint: "The same 28 voices, run on the processor with a compact model. No graphics card needed, but on a slower laptop narration can fall behind and pause to catch up. Downloads about 90 MB the first time it is used." },
-    { id: "light", label: "Light & fast · Paradee-8M",
-      hint: "Eight voices in English, Hindi, French and Spanish. Built in, works with no internet, and stays ahead of playback on almost any machine. Slightly less natural than Kokoro." },
+    { id: "best", label: "Best quality · Kokoro-82M (full model)" },
+    { id: "balanced", label: "Balanced · Kokoro-82M (compact model)" },
+    { id: "light", label: "Light & fast · Paradee-8M" },
   ];
   let gpuPresent = null; // null until the probe answers
+  const engineHintFor = (level) => {
+    if (level === "best") {
+      return "The most natural narration, with 28 English voices, from the full-size model (about 325 MB, downloaded the first time it is used). "
+        + (gpuPresent === false
+          ? "No graphics card was found, so it runs on the processor and needs a fast machine to keep up."
+          : "Runs on the graphics card when there is one, otherwise on the processor. If it sounds garbled or metallic, turn Graphics card off below.");
+    }
+    if (level === "balanced") {
+      return "The same 28 voices from a smaller version of the model (about 90 MB, downloaded the first time it is used), always on the processor. A lighter download, at some cost in sound quality.";
+    }
+    return "Eight voices in English, Hindi, French and Spanish. Built in, works with no internet, and stays ahead of playback on almost any machine.";
+  };
   const engineLevel = () => {
     if (isLightVoice(app.settings.voice)) return "light";
-    return app.settings.slowMode || gpuPresent === false ? "balanced" : "best";
+    return app.settings.slowMode ? "balanced" : "best";
   };
   const knownVoice = (id) => ALL_VOICES.some((v) => v.id === id);
   const lightTwin = (id) => { const m = PARADEE13_VOICES.find((v) => v.kokoro === id); return m ? m.id : PARADEE13_DEFAULT; };
@@ -3248,6 +3275,22 @@ function openSettings() {
   const engineHint = el("div", { class: "hint", style: { marginTop: "8px" } });
   engineField.appendChild(engineSelect);
   engineField.appendChild(engineHint);
+  // Under Best quality on a machine with a graphics card: choose whether the
+  // full model runs there or on the processor. Graphics drivers occasionally
+  // compute speech wrongly (garbled or metallic sound); Off is the way round it.
+  const gpuRow = el("div", { class: "sleep-row", style: { marginTop: "10px" }, hidden: true });
+  const gpuChips = el("div", { class: "chips" });
+  gpuRow.appendChild(el("span", { class: "sleep-label", text: "Graphics card" }));
+  gpuRow.appendChild(gpuChips);
+  engineField.appendChild(gpuRow);
+  const setGpuOff = async (off) => {
+    if (!!app.settings.gpuOff === off) return;
+    app.settings.gpuOff = off;
+    await store.setSetting("gpuOff", off);
+    paintEngine();
+    try { await rebuildEngine(); } catch (e) { console.warn("engine rebuild:", e); }
+    toast(off ? "Best quality now runs on the processor" : "Best quality now runs on the graphics card");
+  };
 
   const playback = el("div", { class: "field", style: { marginTop: "16px" } });
   playback.appendChild(el("label", { text: "Default narrator" }));
@@ -3269,17 +3312,17 @@ function openSettings() {
   };
   const paintEngine = () => {
     engineSelect.innerHTML = "";
-    for (const lv of ENGINE_LEVELS) {
-      const noGpu = lv.id === "best" && gpuPresent === false;
-      const opt = el("option", { value: lv.id, text: lv.label + (noGpu ? " — no graphics card found" : "") });
-      if (noGpu) opt.disabled = true;
-      engineSelect.appendChild(opt);
-    }
+    for (const lv of ENGINE_LEVELS) engineSelect.appendChild(el("option", { value: lv.id, text: lv.label }));
     const level = engineLevel();
     engineSelect.value = level;
-    engineHint.textContent = ENGINE_LEVELS.find((l) => l.id === level).hint;
+    engineHint.textContent = engineHintFor(level);
+    gpuRow.hidden = !(level === "best" && gpuPresent === true);
+    gpuChips.innerHTML = "";
+    const gpuOn = !app.settings.gpuOff;
+    gpuChips.appendChild(el("button", { class: "chip" + (gpuOn ? " active" : ""), onclick: () => setGpuOff(false) }, ["On"]));
+    gpuChips.appendChild(el("button", { class: "chip" + (gpuOn ? "" : " active"), onclick: () => setGpuOff(true) }, ["Off"]));
   };
-  const applyDefaultVoice = (voice, { announce = true } = {}) => {
+  const applyDefaultVoice = (voice, { announce = true, updatePlayer = true } = {}) => {
     app.settings.voice = voice;
     store.setSetting("voice", voice);
     if (app.create) {
@@ -3288,7 +3331,7 @@ function openSettings() {
     }
     // Books with their own narrator keep it; books on the default follow along.
     const book = app.player.book;
-    if (book && !book.voice) { app.player.setVoice(app.settings.voice); app.failedChunks.clear(); }
+    if (updatePlayer && book && !book.voice) { app.player.setVoice(app.settings.voice); app.failedChunks.clear(); }
     if (announce) toast("Default narrator: " + voiceLabel(voice));
   };
   voiceSelect.addEventListener("change", () => applyDefaultVoice(voiceSelect.value));
@@ -3303,8 +3346,11 @@ function openSettings() {
       const slow = level !== "best";
       const slowChanged = !!app.settings.slowMode !== slow;
       if (slowChanged) { app.settings.slowMode = slow; await store.setSetting("slowMode", slow); }
-      applyDefaultVoice(isLightVoice(voice) ? kokoroTwin(voice) : voice, { announce: false });
-      // The graphics choice is fixed when the engine is created, so rebuild it.
+      // The graphics choice is fixed when the engine is created, so that change
+      // needs a rebuild, and the rebuild reopens the current book with the new
+      // narrator itself. Handing the narrator to the old engine first would
+      // start loading a model that is about to be thrown away.
+      applyDefaultVoice(isLightVoice(voice) ? kokoroTwin(voice) : voice, { announce: false, updatePlayer: !slowChanged });
       if (slowChanged) { try { await rebuildEngine(); } catch (e) { console.warn("engine rebuild:", e); } }
     }
     paintEngine();

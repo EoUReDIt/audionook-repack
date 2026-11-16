@@ -31,7 +31,8 @@ real machine, and a fix where it fails:
 - Backup, Import, and folder sync
 - "From a URL…" through the native fetch
 - Installing a new version over an old one keeps the library
-- The Best quality engine on a machine with a graphics card
+- The Best quality engine on a machine with a graphics card, with Graphics card on and off:
+  does either sound wrong, and does the model download once or on every launch?
 - The portable zip on a machine that has never had the app installed
 
 ### 3. Document import quality
@@ -56,6 +57,8 @@ re-import a book from its file without losing its position and bookmarks.
 | Issue | Detail |
 |---|---|
 | Kokoro downloads as soon as Balanced is chosen | Switching engine rebuilds it immediately. With no internet this shows an error. Download on first use instead, with visible progress. |
+| Kokoro sound quality | Reported as worse than the Light voices on a high-end PC. Two causes were fixed (see the changelog); whether the full model now sounds right, on the graphics card and off it, still needs a listener. |
+| Engine switched while another is starting | Logs a worker error to the console. Harmless, but should be silenced by waiting for the start-up to finish. |
 | "Untitled" books | Pasted text whose first line is longer than 80 characters gets no title. Fall back to the first few words. |
 | Unused code still ships | The Explore, sharing and publish code is unreachable but still loaded. Remove it or stop loading it. |
 | Legacy Light voices | Three retired voice engines still point at Hugging Face. Nothing in a fresh install uses them. |

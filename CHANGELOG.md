@@ -3,6 +3,23 @@
 Changes are grouped by sprint, newest first. Versions follow the app version in
 `package.json` and `src-tauri/tauri.conf.json`.
 
+## Unreleased — fixes from testing on a high-end PC
+
+- **Fixed: a book stopped loading after the speech engine was switched.** Changing between
+  Kokoro levels with a book open left the player with no narrator, so every segment failed
+  and the book stayed on "buffering". The book now reloads with the new narrator.
+- **Fixed: switching Kokoro levels replayed old audio.** Audio from the full model, the
+  compact model, and the graphics card is now cached separately, so a change can be heard.
+- **Best quality now always uses the full Kokoro model**, on the graphics card when there is
+  one and otherwise on the processor. Before, a machine without a graphics card silently
+  got the compact model under both Kokoro levels. Measured on a processor, the compact
+  model is no faster than the full one; it is only a smaller download.
+- **Graphics card On/Off** appears under Best quality on machines that have one, to work
+  round graphics drivers that produce garbled speech.
+- **Loading progress is shown for a newly selected engine.** The status line used to keep
+  saying "Narration ready" while Kokoro was still downloading.
+- A superseded engine start-up can no longer mark the new engine as failed.
+
 ## 0.1.0 — first stable release
 
 ### After the first hands-on test

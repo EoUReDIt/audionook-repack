@@ -928,7 +928,11 @@ export function splitTextIntoChunks(text, maxSize = 300) {
       for(let device of availableDevices) {
         try {
           tts = await KokoroTTS.from_pretrained("onnx-community/Kokoro-82M-ONNX", {
-            dtype: device === "webgpu" ? "fp32" : "q8",
+            // Desktop build: the full-precision model can also be asked for on
+            // the processor (params.fullPrecision). The original always fell
+            // back to the 8-bit model there; measured here, it is no faster on
+            // a processor than the full model, only a smaller download.
+            dtype: (device === "webgpu" || params.fullPrecision) ? "fp32" : "q8",
             device,
             progress_callback: (data) => {
               if(data.status !== 'progress') return;
@@ -1149,6 +1153,11 @@ export class TTSEngine {
     // realtime on the device and suggest the Light voice.
     this.onSpeed = opts.onSpeed || (() => {});
     this.allowWebGpu = opts.allowWebGpu !== false;
+    // Desktop build: which Kokoro model to load (see the worker's dtype choice).
+    this.fullPrecision = !!opts.fullPrecision;
+    // What was asked for at creation; allowWebGpu itself is cleared later if
+    // the graphics self-test fails.
+    this._gpuRequested = this.allowWebGpu;
     this.hasWebGpu = false;
     this.gpuFailed = false;
     this.deviceUsed = null;
@@ -1450,7 +1459,7 @@ export class TTSEngine {
           this._failJob(w, w.currentJob, new Error((e && e.message) || "worker error"));
         }
       };
-      worker.postMessage({ type: "init", params: { allowWebGpu: this.allowWebGpu, numThreads, engine, tokenizerJson: extra.tokenizerJson || null, modelBlobUrl: extra.modelBlobUrl || null, ortMjsUrl: extra.ortMjsUrl || null, ortWasmUrl: extra.ortWasmUrl || null, espeakJsUrl: extra.espeakJsUrl || null, espeakDataUrl: extra.espeakDataUrl || null } });
+      worker.postMessage({ type: "init", params: { allowWebGpu: this.allowWebGpu, fullPrecision: this.fullPrecision, numThreads, engine, tokenizerJson: extra.tokenizerJson || null, modelBlobUrl: extra.modelBlobUrl || null, ortMjsUrl: extra.ortMjsUrl || null, ortWasmUrl: extra.ortWasmUrl || null, espeakJsUrl: extra.espeakJsUrl || null, espeakDataUrl: extra.espeakDataUrl || null } });
     });
   }
 
@@ -1653,6 +1662,16 @@ export class TTSEngine {
   // (the default) means the whole book. The player narrows it while audio is
   // playing so background synthesis doesn't compete with playback on small
   // machines, and lifts it again when playback stops (see Player._updateHorizon).
+  // Desktop build: audio made by the full-precision Kokoro model is cached
+  // apart from audio made by the compact one. Without this, switching between
+  // them replayed the old audio and the change could not be heard.
+  _cacheVoice(voice) {
+    if (!this.fullPrecision || engineForVoice(voice) !== "kokoro") return voice;
+    // Graphics-card and processor output are kept apart as well, so the two can
+    // be compared by ear.
+    return voice + (this._gpuRequested ? "@full-gpu" : "@full");
+  }
+
   setHorizon(chunksAhead) {
     const v = Number.isFinite(chunksAhead) && chunksAhead > 0 ? Math.ceil(chunksAhead) : Infinity;
     if (v === this.horizonAhead) return;
@@ -1727,7 +1746,7 @@ export class TTSEngine {
     this._pfAhead = 0;
     this._pfBehind = -1;
     chunks.forEach((textData, index) => {
-      this.jobs.set(index, { index, textData, voice, cacheKey: cacheKeyFor(voice, textData), bookToken: token });
+      this.jobs.set(index, { index, textData, voice, cacheKey: cacheKeyFor(this._cacheVoice(voice), textData), bookToken: token });
       this.pending.add(index);
     });
     this._pump();

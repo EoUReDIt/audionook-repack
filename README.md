@@ -19,7 +19,7 @@ installer fetches it if it is missing). The installer is not code-signed, so Win
 SmartScreen will warn the first time it runs.
 
 The Light narrators work with no internet. The full-quality Kokoro narrators download
-their model (about 90 MB on a machine without a graphics card, about 325 MB with one)
+their model (about 325 MB for Best quality, about 90 MB for Balanced)
 from Hugging Face the first time one is used.
 
 ## Run it from source
@@ -67,8 +67,8 @@ npm run build
   is connected (`app/src/platform.js`).
 - Titles come from the document or its file name; covers from an EPUB's cover image or a
   PDF's first page.
-- Settings has a Speech engine choice: Best quality (Kokoro-82M on a graphics card),
-  Balanced (Kokoro-82M on the processor) or Light & fast (Paradee-8M, built in).
+- Settings has a Speech engine choice: Best quality (the full Kokoro-82M model), Balanced
+  (a compact Kokoro-82M model) or Light & fast (Paradee-8M, built in).
 - While audio plays, speech is generated about ten minutes ahead of the listener rather
   than all at once, which keeps small laptops responsive.
 - Chart tick marks, axis numbers and bare page numbers are dropped when importing a PDF.
