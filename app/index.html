@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audionook</title>
+<meta name="color-scheme" content="dark light">
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
+<link rel="stylesheet" href="src/styles.css">
+<link rel="stylesheet" href="src/desktop.css">
+<style>
+  /* Boot cover: shown until app.js has drawn its first frame. */
+  #bootCover { position: fixed; inset: 0; z-index: 999; display: grid; place-items: center; background: #0f1115; color: #9aa3b2; font: 600 15px system-ui, sans-serif; transition: opacity .25s; }
+  html.boot-done #bootCover { opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body id="output-container">
+<div id="bootCover">Audionook</div>
+
+<div id="app">
+  <div id="bgArt"></div>
+  <header id="topBar">
+    <div class="brand"><span class="brand-mark"></span><span class="brand-name">Audionook</span></div>
+    <div class="search-box" hidden><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4 4"></path></svg><input id="searchInput" type="search" autocomplete="off" spellcheck="false" aria-label="Search"></div>
+    <div class="topbar-actions"><button id="themeBtn" class="icon-btn" title="Toggle theme"></button></div>
+  </header>
+  <nav id="sideNav"><div class="nav-item nav-create" data-route="create"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"></path></svg>
+      Create
+    </div><div class="nav-item" data-route="library"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.6A2.6 2.6 0 0 1 7.6 2H19v20H7.6A2.6 2.6 0 0 1 5 19.4z"></path><path d="M9.2 2v7.4L11.8 7.6 14.4 9.4V2"></path></svg>
+      My Library
+    </div><div class="side-foot" id="sideFoot"></div></nav>
+  <main id="main">
+    <section id="viewCreate" class="view" data-view="create"></section>
+    <section id="viewLibrary" class="view" data-view="library" hidden></section>
+    <!-- Explore is switched off in the desktop build (see src/platform.js); the
+         empty section stays so the original view code has its host element. -->
+    <section id="viewExplore" class="view" data-view="explore" hidden></section>
+  </main>
+  <nav id="bottomNav"><div class="nav-item nav-create" data-route="create"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"></path></svg>
+      Create
+    </div><div class="nav-item" data-route="library"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.6A2.6 2.6 0 0 1 7.6 2H19v20H7.6A2.6 2.6 0 0 1 5 19.4z"></path><path d="M9.2 2v7.4L11.8 7.6 14.4 9.4V2"></path></svg>
+      Library
+    </div></nav>
+</div>
+
+<div id="miniPlayer" hidden></div>
+
+<div id="playerScreen" hidden>
+  <div class="np-bg"></div>
+  <div class="np-head">
+    <button id="npCloseBtn" class="icon-btn" title="Close player" aria-label="Close player"></button>
+    <div class="np-title">
+      <div class="np-title-row"><b id="npTitle"></b><button id="npOptsBtn" class="icon-btn np-more" title="Book options" aria-label="Book options"></button></div>
+      <span id="npAuthor"></span>
+    </div>
+    <div class="np-head-actions">
+      <button id="npThemeBtn" class="icon-btn" title="Toggle theme"></button>
+      <button id="npSettingsBtn" class="icon-btn" title="Settings"></button>
+    </div>
+  </div>
+  <div id="npQueueBar" class="np-queue" hidden></div>
+  <div class="np-body">
+    <div id="npText" class="np-text"><div id="npTextInner" class="np-text-inner"></div></div>
+    <button id="npScrollReturn" class="scroll-return" hidden></button>
+  </div>
+  <div class="np-dock">
+    <div class="np-dock-inner">
+      <div id="bmPop" class="bm-pop" hidden></div>
+      <div id="npScrub" class="scrub">
+        <div class="scrub-track"><div id="npScrubReady" class="scrub-ready"></div><div id="npScrubFill" class="scrub-fill"></div></div>
+        <div id="npScrubKnob" class="scrub-knob"></div>
+      </div>
+      <div class="times"><span id="npTimeNow">0:00</span><span id="npStatus" class="buffering-pill" hidden></span><span id="npTimeTotal">0:00</span></div>
+      <div class="transport">
+        <button id="npRateBtn" class="rate-btn" title="Playback speed"></button>
+        <button id="npBackBtn" class="t-btn" title="Back 10 seconds" aria-label="Back 10 seconds"></button>
+        <button id="npPlayBtn" class="play-btn" title="Play / pause" aria-label="Play or pause"></button>
+        <button id="npFwdBtn" class="t-btn" title="Forward 30 seconds" aria-label="Forward 30 seconds"></button>
+        <button id="npBookmarkBtn" class="t-btn" title="Bookmark this spot" aria-label="Bookmark this spot"></button>
+      </div>
+      <div id="npEngine" class="engine-strip"></div>
+    </div>
+  </div>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+
+<script>
+  // Lifted by app.js once the first frame is drawn; the timeout guarantees the
+  // cover can never stick if something fails before then.
+  window.__boot = { ready() { document.documentElement.classList.add("boot-done"); } };
+  setTimeout(() => window.__boot.ready(), 8000);
+</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
